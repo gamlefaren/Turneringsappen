@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Turneringsschema</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --green: #132d1f;
+  --gold: #e2b84e;
+  --cream: #f8f4ec;
+  --lg: #3d7a52;
+  --fade: #a8cbb4;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --green: #edeae0;
+    --gold: #7a5c10;
+    --cream: #111111;
+    --lg: #1f5c35;
+    --fade: #1a4a2a;
+  }
+  body { color: #111; }
+  .card, .table-card { background: #fff; border-color: #1f5c35; }
+  .config-input { background: #e0ddd3; border-color: #1f5c35; color: #111; }
+  .player-input { color: #111; border-bottom-color: #1f5c35; }
+  .tbl-letter { color: #c0cfca; }
+  .score-input { background: #e0ddd3; border-color: #1f5c35; color: #111; }
+  .top-bar { background: #1a3a2a; }
+  .scoreboard-panel { background: #1a3a2a; }
+  .sb-name { color: #f0ece2; }
+  .winner-badge { background: rgba(122,92,16,0.12); border-color: #7a5c10; color: #5a3c00; }
+  .score-input.winning { border-color: #7a5c10; color: #5a3c00; }
+  .score-input.losing { color: #999; }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--green);
+  color: var(--cream);
+  font-family: 'DM Mono', monospace;
+  display: flex; flex-direction: column; min-height: 100vh;
+}
+
+.view { display: none; flex-direction: column; flex: 1; }
+.view.active { display: flex; }
+
+/* ═══════════ SETUP ═══════════ */
+#setupView { padding: 40px 20px 60px; align-items: center; }
+
+header { text-align: center; margin-bottom: 40px; }
+header h1 {
+font-family: ‘Playfair Display’, serif;
+font-size: clamp(2rem,5vw,3.2rem); font-weight: 900;
+color: var(–gold); letter-spacing: 2px; text-transform: uppercase;
+}
+header p { color: var(–fade); font-size: 0.8rem; letter-spacing: 3px; text-transform: uppercase; margin-top: 6px; }
+
+.card {
+background: rgba(255,255,255,0.07);
+border: 1px solid var(–lg);
+padding: 28px; width: 100%; max-width: 900px; margin-bottom: 20px;
+}
+.card h3 {
+font-family: ‘Playfair Display’, serif; color: var(–gold);
+font-size: 1rem; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 20px;
+}
+
+.config-grid {
+display: grid;
+grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+gap: 20px; margin-bottom: 8px;
+}
+.config-field { display: flex; flex-direction: column; gap: 8px; }
+.config-label { font-size: 0.68rem; letter-spacing: 3px; text-transform: uppercase; color: var(–fade); }
+.config-input {
+background: rgba(0,0,0,0.25); border: 1px solid var(–lg);
+color: var(–cream); font-family: ‘DM Mono’, monospace;
+font-size: 1.5rem; font-weight: 500;
+width: 100%; padding: 10px 14px; outline: none; transition: border-color 0.2s;
+-moz-appearance: textfield;
+}
+.config-input::-webkit-outer-spin-button,
+.config-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.config-input:focus { border-color: var(–gold); }
+.config-hint { font-size: 0.65rem; color: var(–fade); letter-spacing: 1px; }
+.config-warning { font-size: 0.72rem; color: #e8c080; letter-spacing: 1px; padding: 8px 0; min-height: 24px; text-align: center; }
+
+.player-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 8px; }
+.player-item { display: flex; align-items: center; gap: 8px; }
+.player-num { color: var(–gold); font-size: 0.68rem; min-width: 24px; }
+.player-input {
+background: transparent; border: none; border-bottom: 1px solid var(–lg);
+color: var(–cream); font-family: ‘DM Mono’, monospace; font-size: 0.78rem;
+padding: 4px 0; width: 100%; outline: none; transition: border-color 0.2s;
+}
+.player-input:focus { border-bottom-color: var(–gold); }
+
+.btn-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+
+button {
+font-family: ‘DM Mono’, monospace; font-size: 0.8rem; letter-spacing: 2px;
+text-transform: uppercase; padding: 10px 24px; border: 1px solid var(–gold);
+background: transparent; color: var(–gold); cursor: pointer; transition: all 0.2s;
+}
+button:hover { background: var(–gold); color: var(–green); }
+button.primary { background: var(–gold); color: var(–green); font-weight: 700; }
+button.primary:hover { background: #e0bb6a; }
+button:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+
+.msg { text-align: center; font-size: 0.78rem; padding: 10px; letter-spacing: 1px; margin-top: 8px; min-height: 32px; }
+.msg.ok { color: var(–fade); } .msg.err { color: #e8a0a0; }
+
+/* ═══════════ TOURNAMENT ═══════════ */
+#tournamentView { height: 100vh; overflow: hidden; }
+
+.top-bar {
+background: rgba(0,0,0,0.3); border-bottom: 1px solid var(–lg);
+display: flex; align-items: center; justify-content: space-between;
+padding: 10px 24px; flex-shrink: 0; gap: 12px; flex-wrap: wrap;
+}
+.top-bar-title { font-family:‘Playfair Display’,serif; font-size:1.2rem; font-weight:700; color:var(–gold); letter-spacing:2px; text-transform:uppercase; }
+.round-nav { display:flex; align-items:center; gap:12px; }
+.round-indicator { font-size:0.78rem; letter-spacing:2px; color:var(–fade); text-transform:uppercase; min-width:110px; text-align:center; }
+.nav-btn { padding:6px 16px; font-size:0.75rem; }
+.small-btn { padding:6px 14px; font-size:0.7rem; letter-spacing:1px; }
+.top-bar-actions { display:flex; gap:8px; }
+
+.main-content { display:flex; flex:1; overflow:hidden; }
+
+.round-panel { flex:1; overflow-y:auto; padding:24px; display:flex; flex-direction:column; gap:16px; }
+.round-title { font-family:‘Playfair Display’,serif; font-size:1.9rem; font-weight:900; color:var(–gold); letter-spacing:2px; margin-bottom:2px; }
+.round-subtitle { color:var(–fade); font-size:0.7rem; letter-spacing:3px; text-transform:uppercase; }
+
+.tables-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:16px; }
+
+.table-card {
+background: rgba(255,255,255,0.07); border:1px solid var(–lg);
+padding:18px 18px 14px; position:relative; transition:border-color 0.3s;
+animation:cardIn 0.3s ease both;
+}
+@keyframes cardIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+
+.tbl-letter { position:absolute; top:10px; right:14px; font-family:‘Playfair Display’,serif; font-size:2.2rem; font-weight:900; color:var(–lg); line-height:1; }
+.tbl-label { font-size:0.68rem; letter-spacing:4px; text-transform:uppercase; color:var(–fade); margin-bottom:10px; }
+.team-size-tag { font-size:0.6rem; letter-spacing:2px; color:var(–fade); margin-bottom:2px; }
+.player-name-disp { font-size:0.85rem; color:var(–cream); padding:1px 0; }
+
+.score-section { margin-top:14px; border-top:1px solid var(–lg); padding-top:12px; display:flex; flex-direction:column; gap:10px; }
+.score-versus { display:flex; align-items:center; gap:8px; }
+.team-score-block { flex:1; display:flex; flex-direction:column; gap:4px; }
+.score-team-label { font-size:0.6rem; letter-spacing:1px; color:var(–fade); text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.score-input-wrap { display:flex; align-items:center; gap:6px; }
+.score-input {
+background:rgba(0,0,0,0.3); border:1px solid var(–lg); color:var(–cream);
+font-family:‘DM Mono’,monospace; font-size:1.4rem; font-weight:500;
+width:54px; height:44px; text-align:center; outline:none;
+transition:border-color 0.2s, color 0.2s; -moz-appearance:textfield;
+}
+.score-input::-webkit-outer-spin-button,
+.score-input::-webkit-inner-spin-button { -webkit-appearance:none; }
+.score-input:focus { border-color:var(–gold); }
+.score-input.winning { border-color:var(–gold); color:var(–gold); }
+.score-input.losing  { color:var(–fade); }
+.score-stepper { display:flex; flex-direction:column; gap:2px; }
+.step-btn { font-size:0.65rem; padding:2px 6px; border:1px solid var(–lg); line-height:1.4; min-width:22px; letter-spacing:0; }
+.step-btn:hover { background:var(–gold); color:var(–green); border-color:var(–gold); }
+.score-divider { font-size:0.9rem; color:var(–fade); padding:0 2px; align-self:center; margin-top:12px; }
+.score-summary { display:flex; align-items:center; justify-content:center; gap:6px; font-size:0.68rem; color:var(–fade); letter-spacing:1px; min-height:20px; }
+.winner-badge { background:rgba(201,168,76,0.15); border:1px solid var(–gold); color:var(–gold); font-size:0.62rem; padding:2px 8px; letter-spacing:2px; text-transform:uppercase; }
+
+.scoreboard-panel {
+width:270px; flex-shrink:0; background:rgba(0,0,0,0.2);
+border-left:1px solid var(–lg); display:flex; flex-direction:column; overflow:hidden;
+}
+.sb-header { padding:16px 20px 12px; border-bottom:1px solid var(–lg); flex-shrink:0; }
+.sb-title { font-family:‘Playfair Display’,serif; font-size:1rem; color:var(–gold); letter-spacing:3px; text-transform:uppercase; }
+.sb-subtitle { font-size:0.62rem; color:var(–fade); letter-spacing:2px; margin-top:3px; }
+.sb-list { flex:1; overflow-y:auto; padding:6px 0; }
+.sb-row {
+display:flex; align-items:center; padding:6px 16px; gap:8px;
+border-bottom:1px solid rgba(255,255,255,0.04); transition:background 0.2s;
+animation:rowIn 0.2s ease both;
+}
+@keyframes rowIn { from{opacity:0;transform:translateX(6px)} to{opacity:1;transform:none} }
+.sb-row:hover { background:rgba(255,255,255,0.04); }
+.sb-row.top-1 { background:rgba(201,168,76,0.10); }
+.sb-row.top-2 { background:rgba(201,168,76,0.06); }
+.sb-row.top-3 { background:rgba(201,168,76,0.03); }
+.sb-rank { font-size:0.72rem; color:var(–fade); min-width:20px; text-align:right; }
+.sb-rank.gold   { color:#f0c830; font-weight:700; }
+.sb-rank.silver { color:#b0b8c0; font-weight:700; }
+.sb-rank.bronze { color:#c87030; font-weight:700; }
+.sb-name { flex:1; font-size:0.78rem; color:var(–cream); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sb-pts  { font-size:0.82rem; color:var(–gold); font-weight:500; min-width:36px; text-align:right; }
+
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(–lg); border-radius:2px; }
+
+@media (max-width:700px) {
+.scoreboard-panel { width:100%; border-left:none; border-top:1px solid var(–lg); max-height:200px; }
+.main-content { flex-direction:column; }
+}
+@media print {
+.top-bar,.scoreboard-panel,.score-section { display:none; }
+body { background:white; color:#111; font-size:11pt; }
+.round-panel { padding:12px; }
+.round-title { color:#1a3a2a; font-size:1.6rem; margin-bottom:4px; }
+.round-subtitle { color:#222; }
+.tables-grid { gap:10px; }
+.table-card { border:2px solid #333; background:white; page-break-inside:avoid; padding:12px; }
+.tbl-letter { color:#aaa; font-size:1.8rem; }
+.tbl-label { color:#222; font-weight:700; letter-spacing:3px; }
+.team-size-tag { color:#444; }
+.player-name-disp { color:#111; font-size:0.95rem; font-weight:500; }
+.view { display:flex !important; }
+#setupView { display:none !important; }
+}
+</style>
+
+</head>
+<body>
+
+<!-- ═══════════ SETUP ═══════════ -->
+
+<div id="setupView" class="view active">
+  <header>
+    <h1>Turneringsschema</h1>
+    <p>Konfigurera &amp; Kör</p>
+  </header>
+
+  <div class="card">
+    <h3>Inställningar</h3>
+    <div class="config-grid">
+      <div class="config-field">
+        <div class="config-label">Antal spelare</div>
+        <input type="number" class="config-input" id="cfgPlayers" value="21" min="4" max="60" oninput="onConfigChange()">
+        <div class="config-hint">4 – 60 spelare</div>
+      </div>
+      <div class="config-field">
+        <div class="config-label">Antal bord</div>
+        <input type="number" class="config-input" id="cfgTables" value="4" min="1" max="20" oninput="onConfigChange()">
+        <div class="config-hint">1 – 20 bord</div>
+      </div>
+      <div class="config-field">
+        <div class="config-label">Antal omgångar</div>
+        <input type="number" class="config-input" id="cfgRounds" value="7" min="1" max="20" oninput="onConfigChange()">
+        <div class="config-hint">1 – 20 omgångar</div>
+      </div>
+    </div>
+    <div class="config-warning" id="cfgWarning"></div>
+    <div class="config-warning" id="cfgInfo" style="color:var(--fade)"></div>
+  </div>
+
+  <div class="card">
+    <h3>Spelare</h3>
+    <div class="player-grid" id="playerGrid"></div>
+  </div>
+
+  <div class="card">
+    <h3>Starta</h3>
+    <div class="btn-row">
+      <button class="primary" id="startBtn" onclick="generateAndStart()">Generera &amp; Starta Turnering</button>
+      <button onclick="generateOnly()">Generera Schema</button>
+    </div>
+    <div id="setupMsg" class="msg"></div>
+  </div>
+</div>
+
+<!-- ═══════════ TOURNAMENT ═══════════ -->
+
+<div id="tournamentView" class="view">
+  <div class="top-bar">
+    <div class="top-bar-title">Turnering</div>
+    <div class="round-nav">
+      <button class="nav-btn" id="prevBtn" onclick="changeRound(-1)">◀ Föregående</button>
+      <div class="round-indicator" id="roundIndicator"></div>
+      <button class="nav-btn" id="nextBtn" onclick="changeRound(1)">Nästa ▶</button>
+    </div>
+    <div class="top-bar-actions">
+      <button class="small-btn" onclick="switchView('setupView')">← Inställningar</button>
+      <button class="small-btn" onclick="window.print()">Skriv ut</button>
+    </div>
+  </div>
+  <div class="main-content">
+    <div class="round-panel" id="roundPanel"></div>
+    <div class="scoreboard-panel">
+      <div class="sb-header">
+        <div class="sb-title">Totalpoäng</div>
+        <div class="sb-subtitle" id="sbSubtitle">Poäng summeras löpande</div>
+      </div>
+      <div class="sb-list" id="scoreboardList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const MAX_SCORE = 15;
+const TABLE_LETTERS = 'ABCDEFGHIJKLMNOPQRST'.split('');
+
+let CFG = { players: 21, tables: 4, rounds: 7 };
+let names = [], schedule = [], currentRound = 0, scores = [];
+
+// ─── Layout generation ───
+// Rules:
+//   • Each team has min 2 players (no 1v1 or solo teams)
+//   • Max diff between two teams at same table is 1
+//   • So valid table sizes: 2v2, 2v3, 3v2, 3v3
+//   • All players must play (no bench)
+
+function generateLayouts(numPlayers, numTables) {
+  // Each table: [sA, sB] where sA,sB in {2,3} and |sA-sB| <= 1
+  // Valid pairs: [2,2]=4, [2,3]=5, [3,2]=5, [3,3]=6
+  // Find all combos of numTables pairs summing to numPlayers
+  const validPairs = [[2,2],[2,3],[3,2],[3,3]];
+  const results = [];
+
+  function recurse(remaining, ti, current) {
+    if (ti === numTables) {
+      if (remaining === 0) results.push([...current]);
+      return;
+    }
+    for (const pair of validPairs) {
+      const sum = pair[0] + pair[1];
+      if (sum <= remaining) {
+        current.push(pair);
+        recurse(remaining - sum, ti + 1, current);
+        current.pop();
+      }
+    }
+  }
+  recurse(numPlayers, 0, []);
+
+  // Deduplicate
+  const seen = new Set();
+  return results.filter(l => {
+    const key = JSON.stringify([...l].sort());
+    if (seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+}
+
+// ─── Validation ───
+function getConfig() {
+  return {
+    players: parseInt(document.getElementById('cfgPlayers').value) || 0,
+    tables:  parseInt(document.getElementById('cfgTables').value)  || 0,
+    rounds:  parseInt(document.getElementById('cfgRounds').value)  || 0,
+  };
+}
+
+function validateConfig(cfg) {
+  if (cfg.players < 4)  return 'Minst 4 spelare krävs.';
+  if (cfg.tables < 1)   return 'Minst 1 bord krävs.';
+  if (cfg.rounds < 1)   return 'Minst 1 omgång krävs.';
+  // Min players needed: tables * 4 (each table 2v2)
+  // Max players: tables * 6 (each table 3v3)
+  const minP = cfg.tables * 4;
+  const maxP = cfg.tables * 6;
+  if (cfg.players < minP) return `${cfg.tables} bord kräver minst ${minP} spelare (2 vs 2 per bord).`;
+  if (cfg.players > maxP) return `${cfg.players} spelare på ${cfg.tables} bord går inte (max ${maxP}). Lägg till fler bord.`;
+  const layouts = generateLayouts(cfg.players, cfg.tables);
+  if (layouts.length === 0) return `${cfg.players} spelare kan inte fördelas jämnt på ${cfg.tables} bord med dessa regler.`;
+  return null;
+}
+
+function getLayoutInfo(cfg) {
+  const layouts = generateLayouts(cfg.players, cfg.tables);
+  if (!layouts.length) return '';
+  // Show a typical layout
+  const l = layouts[0];
+  const desc = l.map(p => `${p[0]}v${p[1]}`).join(', ');
+  return `Typisk fördelning: ${desc}`;
+}
+
+function onConfigChange() {
+  const cfg = getConfig();
+  const err = validateConfig(cfg);
+  document.getElementById('cfgWarning').textContent = err || '';
+  document.getElementById('cfgInfo').textContent = err ? '' : getLayoutInfo(cfg);
+  document.getElementById('startBtn').disabled = !!err;
+  if (cfg.players !== CFG.players && !err) {
+    CFG = cfg;
+    buildGrid(cfg.players);
+  }
+  if (!err) CFG = cfg;
+}
+
+// ─── Player grid ───
+function buildGrid(n) {
+  const g = document.getElementById('playerGrid');
+  const existing = Array.from(g.querySelectorAll('.player-input')).map(i=>i.value);
+  g.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('div');
+    d.className = 'player-item';
+    const val = existing[i] || `Spelare ${i+1}`;
+    d.innerHTML = `<span class="player-num">${i+1}</span>
+      <input class="player-input" id="p${i}" value="${val}">`;
+    g.appendChild(d);
+  }
+}
+
+function readNames(n) {
+  return Array.from({length:n},(_,i)=>{
+    const el = document.getElementById(`p${i}`);
+    return el ? (el.value.trim()||`Spelare ${i+1}`) : `Spelare ${i+1}`;
+  });
+}
+
+function setMsg(txt, ok=true) {
+  const el = document.getElementById('setupMsg');
+  el.textContent = txt; el.className='msg '+(ok?'ok':'err');
+}
+
+// ─── Generate & start ───
+function generateOnly() {
+  const cfg = getConfig();
+  const err = validateConfig(cfg);
+  if (err) { setMsg(err,false); return; }
+  setMsg('Genererar...');
+  setTimeout(()=>{
+    const s = buildSchedule(cfg);
+    if (!s) { setMsg('Misslyckades – försök igen.', false); return; }
+    schedule=s; names=readNames(cfg.players);
+    scores=schedule.map(r=>r.tables.map(()=>({s1:null,s2:null})));
+    setMsg(`✓ ${schedule.length} omgångar genererade.`);
+  },10);
+}
+
+function generateAndStart() {
+  const cfg = getConfig();
+  const err = validateConfig(cfg);
+  if (err) { setMsg(err,false); return; }
+  setMsg('Genererar...');
+  setTimeout(()=>{
+    const s = buildSchedule(cfg);
+    if (!s) { setMsg('Misslyckades – försök igen.', false); return; }
+    schedule=s; names=readNames(cfg.players);
+    scores=schedule.map(r=>r.tables.map(()=>({s1:null,s2:null})));
+    currentRound=0;
+    switchView('tournamentView');
+    renderRound(); renderScoreboard();
+  },10);
+}
+
+// ─── Schedule algorithm ───
+function shuffle(a) {
+  const b=[...a];
+  for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}
+  return b;
+}
+function pKey(a,b){return a<b?`${a}-${b}`:`${b}-${a}`;}
+function teamPairs(t){
+  const p=[];
+  for(let i=0;i<t.length;i++)for(let j=i+1;j<t.length;j++)p.push(pKey(t[i],t[j]));
+  return p;
+}
+function combos(arr,k){
+  if(k===0)return[[]];if(arr.length<k)return[];
+  const r=[];
+  for(let i=0;i<=arr.length-k;i++)
+    for(const c of combos(arr.slice(i+1),k-1))r.push([arr[i],...c]);
+  return r;
+}
+
+function tryLayout(pool, layout, partnerships) {
+  function fill(ti, used) {
+    if (ti === layout.length) return [];
+    const [sA,sB] = layout[ti];
+    const avail = pool.filter(p=>!used.has(p));
+    for (const tA of shuffle(combos(avail,sA))) {
+      if (teamPairs(tA).some(p=>partnerships.has(p))) continue;
+      const usedA = new Set([...used,...tA]);
+      const avail2 = pool.filter(p=>!usedA.has(p));
+      for (const tB of shuffle(combos(avail2,sB))) {
+        if (teamPairs(tB).some(p=>partnerships.has(p))) continue;
+        const usedB = new Set([...usedA,...tB]);
+        const rest = fill(ti+1,usedB);
+        if (rest !== null) return [{team1:tA,team2:tB},...rest];
+      }
+    }
+    return null;
+  }
+  return fill(0, new Set());
+}
+
+function buildSchedule(cfg) {
+  const {players:N, tables:T, rounds:R} = cfg;
+  const layouts = generateLayouts(N, T);
+  if (!layouts.length) return null;
+  const playerList   = Array.from({length:N},(_,i)=>i);
+  const partnerships = new Set();
+  const rounds = [];
+  for (let r=0;r<R;r++) {
+    let tables=null;
+    for (let a=0;a<200;a++) {
+      for (const layout of shuffle(layouts)) {
+        tables=tryLayout(playerList,layout,partnerships);
+        if(tables)break;
+      }
+      if(tables)break;
+    }
+    if(!tables){if(rounds.length===0)return null;break;}
+    tables.forEach(t=>{
+      teamPairs(t.team1).forEach(p=>partnerships.add(p));
+      teamPairs(t.team2).forEach(p=>partnerships.add(p));
+    });
+    rounds.push({tables});
+  }
+  return rounds.length>0?rounds:null;
+}
+
+// ─── Render round ───
+function renderRound() {
+  if(!schedule.length)return;
+  const panel=document.getElementById('roundPanel');
+  const round=schedule[currentRound];
+  const ri=currentRound;
+  document.getElementById('prevBtn').disabled=ri===0;
+  document.getElementById('nextBtn').disabled=ri===schedule.length-1;
+  document.getElementById('roundIndicator').textContent=`Omgång ${ri+1} / ${schedule.length}`;
+
+  panel.innerHTML=`
+    <div>
+      <div class="round-title">Omgång ${ri+1}</div>
+      <div class="round-subtitle">Ange poäng per bord · max ${MAX_SCORE} poäng</div>
+    </div>
+    <div class="tables-grid" id="tablesGrid"></div>`;
+
+  const grid=document.getElementById('tablesGrid');
+  round.tables.forEach((table,ti)=>{
+    const {s1,s2}=scores[ri][ti];
+    const t1Names=table.team1.map(i=>names[i]);
+    const t2Names=table.team2.map(i=>names[i]);
+    const t1Label=t1Names.join(' & ');
+    const t2Label=t2Names.join(' & ');
+    const w1=s1!==null&&s2!==null&&s1>s2;
+    const w2=s1!==null&&s2!==null&&s2>s1;
+
+    const card=document.createElement('div');
+    card.className='table-card';
+    card.id=`card_${ri}_${ti}`;
+    card.style.animationDelay=`${ti*0.06}s`;
+    if(s1!==null&&s2!==null)card.style.borderColor='var(--gold)';
+
+    card.innerHTML=`
+      <div class="tbl-label">Bord</div>
+      <div class="tbl-letter">${TABLE_LETTERS[ti]||ti+1}</div>
+      <div style="margin-bottom:6px">
+        <div class="team-size-tag">${table.team1.length} spelare</div>
+        ${t1Names.map(n=>`<div class="player-name-disp">${n}</div>`).join('')}
+      </div>
+      <div>
+        <div class="team-size-tag">${table.team2.length} spelare</div>
+        ${t2Names.map(n=>`<div class="player-name-disp">${n}</div>`).join('')}
+      </div>
+      <div class="score-section">
+        <div class="score-versus">
+          <div class="team-score-block">
+            <div class="score-team-label" title="${t1Label}">${t1Label}</div>
+            <div class="score-input-wrap">
+              <div class="score-stepper">
+                <button class="step-btn" onclick="stepScore(${ri},${ti},1,1)">▲</button>
+                <button class="step-btn" onclick="stepScore(${ri},${ti},1,-1)">▼</button>
+              </div>
+              <input type="number" min="0" max="${MAX_SCORE}"
+                class="score-input ${w1?'winning':w2?'losing':''}"
+                id="score_${ri}_${ti}_1"
+                value="${s1!==null?s1:''}" placeholder="–"
+                oninput="updateScore(${ri},${ti},1,this.value)">
+            </div>
+          </div>
+          <div class="score-divider">–</div>
+          <div class="team-score-block">
+            <div class="score-team-label" title="${t2Label}">${t2Label}</div>
+            <div class="score-input-wrap">
+              <input type="number" min="0" max="${MAX_SCORE}"
+                class="score-input ${w2?'winning':w1?'losing':''}"
+                id="score_${ri}_${ti}_2"
+                value="${s2!==null?s2:''}" placeholder="–"
+                oninput="updateScore(${ri},${ti},2,this.value)">
+              <div class="score-stepper">
+                <button class="step-btn" onclick="stepScore(${ri},${ti},2,1)">▲</button>
+                <button class="step-btn" onclick="stepScore(${ri},${ti},2,-1)">▼</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="score-summary" id="summary_${ri}_${ti}"></div>
+      </div>`;
+    grid.appendChild(card);
+    if(s1!==null&&s2!==null)refreshCardVisuals(ri,ti);
+  });
+}
+
+// ─── Score logic ───
+function clamp(v){
+  if(v===null||v==='')return null;
+  const n=parseInt(v,10);
+  if(isNaN(n))return null;
+  return Math.max(0,Math.min(MAX_SCORE,n));
+}
+function updateScore(r,t,team,rawVal){
+  const val=clamp(rawVal);
+  if(team===1)scores[r][t].s1=val;else scores[r][t].s2=val;
+  refreshCardVisuals(r,t);renderScoreboard();
+}
+function stepScore(r,t,team,delta){
+  const cur=(team===1?scores[r][t].s1:scores[r][t].s2)??0;
+  const next=Math.max(0,Math.min(MAX_SCORE,cur+delta));
+  if(team===1)scores[r][t].s1=next;else scores[r][t].s2=next;
+  const inp=document.getElementById(`score_${r}_${t}_${team}`);
+  if(inp)inp.value=next;
+  refreshCardVisuals(r,t);renderScoreboard();
+}
+function refreshCardVisuals(r,t){
+  const{s1,s2}=scores[r][t];
+  const inp1=document.getElementById(`score_${r}_${t}_1`);
+  const inp2=document.getElementById(`score_${r}_${t}_2`);
+  const summary=document.getElementById(`summary_${r}_${t}`);
+  const card=document.getElementById(`card_${r}_${t}`);
+  if(!inp1||!inp2)return;
+  inp1.classList.remove('winning','losing');
+  inp2.classList.remove('winning','losing');
+  if(s1!==null&&s2!==null){
+    if(s1>s2){inp1.classList.add('winning');inp2.classList.add('losing');}
+    else if(s2>s1){inp2.classList.add('winning');inp1.classList.add('losing');}
+    if(card)card.style.borderColor='var(--gold)';
+    if(summary){
+      const table=schedule[r].tables[t];
+      const winner=s1>s2?table.team1.map(i=>names[i]).join(' & ')
+                  :s2>s1?table.team2.map(i=>names[i]).join(' & ')
+                  :null;
+      summary.innerHTML=winner
+        ?`<span class="winner-badge">★ ${winner}</span>`
+        :`<span>Oavgjort ${s1}–${s2}</span>`;
+    }
+  } else {
+    if(card)card.style.borderColor='';
+    if(summary)summary.innerHTML='';
+  }
+}
+
+// ─── Scoreboard ───
+function computeScores(){
+  const pts=new Array(names.length).fill(0);
+  scores.forEach((rnd,ri)=>{
+    rnd.forEach((sc,ti)=>{
+      if(sc.s1===null||sc.s2===null)return;
+      schedule[ri].tables[ti].team1.forEach(p=>pts[p]+=sc.s1);
+      schedule[ri].tables[ti].team2.forEach(p=>pts[p]+=sc.s2);
+    });
+  });
+  return pts.map((p,i)=>({idx:i,name:names[i],pts:p}));
+}
+function renderScoreboard(){
+  const sorted=computeScores().sort((a,b)=>b.pts-a.pts);
+  const list=document.getElementById('scoreboardList');
+  const played=scores.flat().filter(s=>s.s1!==null&&s.s2!==null).length;
+  document.getElementById('sbSubtitle').textContent=`${played} matcher registrerade`;
+  list.innerHTML='';
+  let rank=0,prevPts=-1;
+  sorted.forEach((s,i)=>{
+    if(s.pts!==prevPts){rank=i+1;prevPts=s.pts;}
+    const row=document.createElement('div');
+    row.className='sb-row'+(rank===1?' top-1':rank===2?' top-2':rank===3?' top-3':'');
+    row.style.animationDelay=`${i*0.025}s`;
+    const medals=['🥇','🥈','🥉'];
+    const rankEl=rank<=3
+      ?`<span class="sb-rank ${['gold','silver','bronze'][rank-1]}">${medals[rank-1]}</span>`
+      :`<span class="sb-rank">${rank}</span>`;
+    row.innerHTML=`${rankEl}<span class="sb-name">${s.name}</span><span class="sb-pts">${s.pts}p</span>`;
+    list.appendChild(row);
+  });
+}
+
+// ─── Nav ───
+function changeRound(dir){
+  const next=currentRound+dir;
+  if(next<0||next>=schedule.length)return;
+  currentRound=next;renderRound();
+}
+function switchView(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+buildGrid(21);
+onConfigChange();
+</script>
+
+</body>
+</html>
